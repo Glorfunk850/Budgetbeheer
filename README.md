@@ -18,7 +18,7 @@ CSV-knop om gegevens over te zetten, en maak regelmatig een back-up.
 ## Online zetten met GitHub Pages
 
 1. Maak een nieuwe repository op GitHub, bijvoorbeeld `budgetbeheer`.
-2. Upload alle bestanden uit deze map (ook de map `icons` en het bestand `.nojekyll`) naar de hoofdmap van de repository.
+2. Upload alle bestanden uit deze map (ook de iconen en het bestand `.nojekyll`) naar de hoofdmap van de repository.
 3. Ga naar **Settings → Pages**, kies bij *Source* **Deploy from a branch**, selecteer de branch `main` en de map `/ (root)`, en klik op **Save**.
 4. Na een minuutje staat de app op `https://<gebruikersnaam>.github.io/budgetbeheer/`.
 
@@ -42,5 +42,5 @@ geïnstalleerde apps de nieuwe versie ophalen.
 | `index.html` | De volledige app (HTML, CSS en JavaScript) |
 | `manifest.webmanifest` | Naam, kleuren en iconen voor installatie als app |
 | `sw.js` | Service worker voor offline gebruik |
-| `icons/` | App-iconen |
+| `icon-*.png`, `icon.svg` | App-iconen |
 | `.nojekyll` | Zorgt dat GitHub Pages de bestanden ongewijzigd serveert |

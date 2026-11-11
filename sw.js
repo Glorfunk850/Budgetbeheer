@@ -5,11 +5,11 @@ const CORE = [
   "./",
   "./index.html",
   "./manifest.webmanifest",
-  "./icons/icon.svg",
-  "./icons/icon-192.png",
-  "./icons/icon-512.png",
-  "./icons/icon-maskable-512.png",
-  "./icons/icon-180.png",
+  "./icon.svg",
+  "./icon-192.png",
+  "./icon-512.png",
+  "./icon-maskable-512.png",
+  "./icon-180.png",
   "https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js"
 ];
 
