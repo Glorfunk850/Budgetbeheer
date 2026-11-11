@@ -1,0 +1,1070 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Budgetbeheer</title>
+<meta name="theme-color" content="#1d4f7a">
+<meta name="description" content="Persoonlijk budgetbeheer: inkomsten, uitgaven, budgetten en week-, maand- en jaaroverzichten.">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Budget">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Young+Serif&display=swap" rel="stylesheet">
+<style>
+/* Layout: één kolom met kop, tabbladen en periodenavigatie; samenvatting boven, detail eronder. */
+:root {
+  color-scheme: light;
+  --bg: #f4f6f8;
+  --surface: #ffffff;
+  --ink: #14202b;
+  --muted: #5b6875;
+  --line: #dde3e9;
+  --accent: #1d4f7a;
+  --accent-ink: #ffffff;
+  --accent-soft: #e3edf6;
+  --pos: #0b7a4b;
+  --neg: #c0392b;
+  --s-in: #1baf7a;
+  --s-out: #e34948;
+  --s-seq: #2a78d6;
+  --good: #0ca30c;
+  --warn: #c98500;
+  --crit: #d03b3b;
+  --font-display: "Young Serif", Georgia, "Times New Roman", serif;
+  --font-body: "Figtree", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --radius: 10px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #121820;
+    --surface: #1a222c;
+    --ink: #e9eef3;
+    --muted: #9fadba;
+    --line: #2c3743;
+    --accent: #8cbbe6;
+    --accent-ink: #0d1a26;
+    --accent-soft: #22303e;
+    --pos: #4fd39a;
+    --neg: #ff8a7d;
+    --s-in: #199e70;
+    --s-out: #e66767;
+    --s-seq: #3987e5;
+    --warn: #fab219;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #121820;
+  --surface: #1a222c;
+  --ink: #e9eef3;
+  --muted: #9fadba;
+  --line: #2c3743;
+  --accent: #8cbbe6;
+  --accent-ink: #0d1a26;
+  --accent-soft: #22303e;
+  --pos: #4fd39a;
+  --neg: #ff8a7d;
+  --s-in: #199e70;
+  --s-out: #e66767;
+  --s-seq: #3987e5;
+  --warn: #fab219;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 15px; line-height: 1.45; }
+button, input, select { font: inherit; color: inherit; }
+.wrap { max-width: 1040px; margin: 0 auto; padding: 0 16px 96px; }
+header.top { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 20px 0 12px; flex-wrap: wrap; }
+h1 { font-family: var(--font-display); font-weight: 400; font-size: 28px; margin: 0; letter-spacing: -0.01em; }
+h2 { font-size: 16px; margin: 0 0 12px; font-weight: 700; text-wrap: balance; }
+.store-note { font-size: 13px; color: var(--muted); }
+nav.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); overflow-x: auto; }
+nav.tabs a { padding: 10px 14px; text-decoration: none; color: var(--muted); font-weight: 600; border-bottom: 2px solid transparent; white-space: nowrap; }
+nav.tabs a[aria-current="page"] { color: var(--ink); border-bottom-color: var(--accent); }
+nav.tabs a:hover { color: var(--ink); }
+.period { display: flex; align-items: center; gap: 8px; margin: 16px 0; flex-wrap: wrap; }
+.period .label { font-family: var(--font-display); font-size: 21px; min-width: 0; flex: 1 1 auto; }
+.btn { border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 7px 12px; cursor: pointer; font-weight: 600; }
+.btn:hover { border-color: var(--accent); }
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.btn.danger { color: var(--neg); }
+.btn.small { padding: 4px 9px; font-size: 13px; }
+.btn.icon { width: 38px; padding: 7px 0; text-align: center; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 16px; }
+.tile { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px; }
+.tile .k { font-size: 13px; color: var(--muted); font-weight: 600; }
+.tile .v { font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; margin-top: 2px; }
+.tile .sub { font-size: 13px; color: var(--muted); margin-top: 2px; font-variant-numeric: tabular-nums; }
+.tile.saldo { border-color: var(--accent); background: var(--accent-soft); }
+.pos { color: var(--pos); }
+.neg { color: var(--neg); }
+.grid2 { display: grid; grid-template-columns: 3fr 2fr; gap: 16px; margin-bottom: 16px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; min-width: 0; }
+.card + .card { margin-top: 16px; }
+.grid2 .card + .card { margin-top: 0; }
+.chart-box { position: relative; height: 260px; }
+.legend { display: flex; gap: 16px; font-size: 13px; color: var(--muted); margin-bottom: 8px; }
+.legend span::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; background: var(--c); }
+.list { display: flex; flex-direction: column; }
+.row { display: grid; grid-template-columns: 1fr auto; gap: 8px; padding: 9px 4px; border-bottom: 1px solid var(--line); cursor: pointer; align-items: center; }
+.row:last-child { border-bottom: 0; }
+.row:hover { background: var(--accent-soft); }
+.row .t { font-weight: 600; }
+.row .m { font-size: 13px; color: var(--muted); }
+.row .a { font-weight: 700; font-variant-numeric: tabular-nums; text-align: right; }
+.chip { display: inline-block; font-size: 12px; padding: 1px 7px; border-radius: 99px; background: var(--accent-soft); color: var(--muted); font-weight: 600; margin-left: 6px; vertical-align: 1px; }
+.day-h { display: flex; justify-content: space-between; font-weight: 700; font-size: 13px; color: var(--muted); text-transform: capitalize; padding: 12px 4px 4px; border-bottom: 1px solid var(--line); font-variant-numeric: tabular-nums; }
+.empty { color: var(--muted); padding: 10px 4px; font-size: 14px; }
+.budget { padding: 8px 0; border-bottom: 1px solid var(--line); }
+.budget:last-child { border-bottom: 0; }
+.budget .top { display: flex; justify-content: space-between; gap: 8px; font-size: 14px; }
+.budget .top b { font-weight: 600; }
+.budget .nums { font-variant-numeric: tabular-nums; color: var(--muted); }
+.bar { height: 8px; background: var(--line); border-radius: 99px; overflow: hidden; margin: 6px 0 4px; }
+.bar i { display: block; height: 100%; border-radius: 99px; background: var(--st); }
+.status { font-size: 12px; font-weight: 700; color: var(--st); }
+table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+th, td { text-align: right; padding: 8px 6px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th:first-child, td:first-child { text-align: left; }
+th { font-size: 12px; color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+tbody tr.click { cursor: pointer; }
+tbody tr.click:hover { background: var(--accent-soft); }
+tfoot td { font-weight: 700; border-bottom: 0; }
+.scroll-x { overflow-x: auto; }
+.fab { position: fixed; right: 20px; bottom: 20px; width: 58px; height: 58px; border-radius: 50%; border: 0; background: var(--accent); color: var(--accent-ink); font-size: 30px; line-height: 1; cursor: pointer; box-shadow: 0 6px 18px rgba(0,0,0,.22); z-index: 20; }
+.banner { background: var(--accent-soft); border: 1px solid var(--accent); border-radius: var(--radius); padding: 12px 14px; margin: 16px 0 0; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; justify-content: space-between; }
+.banner p { margin: 0; flex: 1 1 320px; }
+.banner .acts { display: flex; gap: 8px; flex-wrap: wrap; }
+.toolbar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; align-items: center; }
+.toolbar input, .toolbar select, .field input, .field select { border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 8px 10px; min-width: 0; }
+.toolbar input[type="search"] { flex: 1 1 200px; }
+dialog { border: 0; border-radius: 14px; padding: 0; background: var(--surface); color: var(--ink); width: min(460px, calc(100vw - 32px)); box-shadow: 0 20px 50px rgba(0,0,0,.3); }
+dialog::backdrop { background: rgba(10, 20, 30, .45); }
+.dlg { padding: 20px; display: flex; flex-direction: column; gap: 12px; }
+.dlg h3 { font-family: var(--font-display); font-weight: 400; font-size: 21px; margin: 0; }
+.dlg .acts { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; margin-top: 4px; }
+.dlg .acts .left { margin-right: auto; }
+.field { display: flex; flex-direction: column; gap: 4px; }
+.field label { font-size: 13px; font-weight: 600; color: var(--muted); }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.seg { display: grid; grid-template-columns: repeat(3, 1fr); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.seg button { border: 0; background: var(--surface); padding: 9px; cursor: pointer; font-weight: 600; color: var(--muted); }
+.seg button[aria-pressed="true"].in { background: var(--pos); color: #fff; }
+.seg button[aria-pressed="true"].out { background: var(--neg); color: #fff; }
+.seg button[aria-pressed="true"].refund { background: var(--accent); color: var(--accent-ink); }
+.check { display: flex; gap: 8px; align-items: center; font-weight: 600; }
+.amount-input { font-size: 22px !important; font-weight: 700; font-variant-numeric: tabular-nums; }
+.err { color: var(--neg); font-size: 13px; min-height: 1em; }
+textarea { width: 100%; min-height: 180px; border: 1px solid var(--line); border-radius: 8px; padding: 8px; background: var(--bg); color: var(--ink); font: 12px/1.4 ui-monospace, Menlo, monospace; }
+.cat-list { display: flex; flex-direction: column; gap: 6px; }
+.cat-item { display: grid; grid-template-columns: 1fr auto auto; gap: 6px; align-items: center; }
+.cat-item input { border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 6px 9px; min-width: 0; }
+.budget-item { display: grid; grid-template-columns: 1fr 130px; gap: 8px; align-items: center; padding: 4px 0; }
+.budget-item input { border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 6px 9px; text-align: right; font-variant-numeric: tabular-nums; min-width: 0; }
+.hint { font-size: 13px; color: var(--muted); margin: 0 0 10px; }
+.loading { padding: 40px 0; color: var(--muted); }
+.toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 8px; font-weight: 600; z-index: 50; max-width: calc(100vw - 32px); }
+@media (max-width: 760px) {
+  .grid2 { grid-template-columns: 1fr; }
+  .tiles { grid-template-columns: 1fr 1fr; }
+  .tiles .tile.saldo { grid-column: 1 / -1; }
+  .tile .v { font-size: 22px; }
+}
+@media (max-width: 420px) {
+  .two { grid-template-columns: 1fr; }
+}
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <h1>Budgetbeheer</h1>
+    <div class="store-note" id="storeNote">Gegevens laden…</div>
+  </header>
+  <nav class="tabs" id="tabs">
+    <a href="#week">Week</a>
+    <a href="#maand">Maand</a>
+    <a href="#jaar">Jaar</a>
+    <a href="#transacties">Transacties</a>
+    <a href="#instellingen">Instellingen</a>
+  </nav>
+  <div id="bannerSlot"></div>
+  <main id="main"><div class="loading">Gegevens laden…</div></main>
+</div>
+<button class="fab" id="fab" aria-label="Transactie toevoegen" title="Transactie toevoegen">+</button>
+<dialog id="dlg"><div id="dlgBody"></div></dialog>
+<input type="file" id="fileIn" accept=".csv,.txt,.json,text/csv,application/json" hidden>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js"></script>
+<script>
+"use strict";
+/* ---------- Hulpfuncties ---------- */
+const EUR = new Intl.NumberFormat("nl-BE", { style: "currency", currency: "EUR" });
+const NUM = new Intl.NumberFormat("nl-BE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const fmt = n => EUR.format(n || 0);
+const MONTHS = ["januari","februari","maart","april","mei","juni","juli","augustus","september","oktober","november","december"];
+const MON_S = ["jan","feb","mrt","apr","mei","jun","jul","aug","sep","okt","nov","dec"];
+const DAYS = ["maandag","dinsdag","woensdag","donderdag","vrijdag","zaterdag","zondag"];
+const DAYS_S = ["ma","di","wo","do","vr","za","zo"];
+const pad = n => String(n).padStart(2, "0");
+const ds = d => d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
+const pd = s => { const [y, m, d] = s.split("-").map(Number); return new Date(y, m - 1, d); };
+const addDays = (d, n) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
+const startOfWeek = d => addDays(d, -((d.getDay() + 6) % 7));
+const dim = (y, m) => new Date(y, m + 1, 0).getDate();
+const ym = s => s.slice(0, 7);
+const r2 = n => Math.round(n * 100) / 100;
+function isoWeek(d) {
+  const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  const day = t.getUTCDay() || 7;
+  t.setUTCDate(t.getUTCDate() + 4 - day);
+  const y0 = new Date(Date.UTC(t.getUTCFullYear(), 0, 1));
+  return Math.ceil(((t - y0) / 86400000 + 1) / 7);
+}
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+const todayS = () => ds(new Date());
+function parseAmount(v) {
+  if (typeof v === "number") return v;
+  let s = String(v || "").trim().replace(/[€\s]/g, "");
+  if (!s) return NaN;
+  if (s.includes(",") && s.includes(".")) {
+    if (s.lastIndexOf(",") > s.lastIndexOf(".")) s = s.replace(/\./g, "").replace(",", ".");
+    else s = s.replace(/,/g, "");
+  } else if (s.includes(",")) s = s.replace(",", ".");
+  return Number(s);
+}
+function toast(msg) {
+  const t = document.createElement("div");
+  t.className = "toast"; t.textContent = msg; t.setAttribute("role", "status");
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 2800);
+}
+
+/* ---------- Gegevensmodel ---------- */
+const DEFAULT_CATS = {
+  in: ["Loon", "Groeipakket", "Overige"],
+  out: ["Wonen", "Boodschappen", "Vervoer", "Energie & water", "Verzekeringen", "Gezondheid", "Vrije tijd", "Kleding", "Abonnementen", "Sparen", "Overige"]
+};
+const defaultSettings = () => ({ cats: { in: [...DEFAULT_CATS.in], out: [...DEFAULT_CATS.out] }, budgets: {}, recurring: [] });
+let R = { settings: defaultSettings(), months: {} }; // opgeslagen gegevens
+let S = R; // wat getoond wordt (R, of voorbeelddata)
+let pendingCharts = [];
+let demo = false;
+let loaded = false;
+
+function normalizeSettings(d) {
+  const s = defaultSettings();
+  if (d && d.cats) {
+    if (Array.isArray(d.cats.in)) s.cats.in = d.cats.in.map(String);
+    if (Array.isArray(d.cats.out)) s.cats.out = d.cats.out.map(String);
+  }
+  if (d && d.budgets && typeof d.budgets === "object") s.budgets = { ...d.budgets };
+  if (d && Array.isArray(d.recurring)) s.recurring = d.recurring.filter(r => r && r.start && r.freq);
+  return s;
+}
+
+function recurringInstances(rule, from, to) {
+  const out = [];
+  const start = rule.start, end = rule.end || "9999-12-31";
+  const lo = from > start ? from : start;
+  const hi = to < end ? to : end;
+  if (lo > hi) return out;
+  const mk = date => ({ id: "r:" + rule.id + ":" + date, ruleId: rule.id, recurring: true, date, type: rule.type, amount: rule.amount, cat: rule.cat, desc: rule.desc || "" });
+  if (rule.freq === "week") {
+    let d = pd(start);
+    const loD = pd(lo);
+    if (d < loD) d = addDays(d, Math.ceil((loD - d) / 86400000 / 7) * 7);
+    while (ds(d) <= hi) { out.push(mk(ds(d))); d = addDays(d, 7); }
+  } else {
+    const day = pd(start).getDate();
+    let y = +lo.slice(0, 4), m = +lo.slice(5, 7) - 1;
+    for (let i = 0; i < 1200; i++) {
+      const date = ds(new Date(y, m, Math.min(day, dim(y, m))));
+      if (date > hi) break;
+      if (date >= lo) out.push(mk(date));
+      m++; if (m > 11) { m = 0; y++; }
+    }
+  }
+  return out;
+}
+
+function getRange(from, to) {
+  const list = [];
+  for (const k of Object.keys(S.months)) {
+    if (k < ym(from) || k > ym(to)) continue;
+    for (const t of S.months[k]) if (t.date >= from && t.date <= to) list.push(t);
+  }
+  for (const r of S.settings.recurring) list.push(...recurringInstances(r, from, to));
+  list.sort((a, b) => a.date < b.date ? 1 : a.date > b.date ? -1 : 0);
+  return list;
+}
+function totals(list) {
+  let inc = 0, out = 0, ref = 0;
+  for (const t of list) { if (t.type === "in") inc += t.amount; else if (t.type === "refund") ref += t.amount; else out += t.amount; }
+  return { inc: r2(inc), out: r2(out - ref), saldo: r2(inc - out + ref), ref: r2(ref) };
+}
+const catType = type => type === "in" ? "in" : "out";
+let refundMap = new Map();
+function buildRefundMap() {
+  refundMap = new Map();
+  for (const t of allStored()) if (t.type === "refund" && t.linkId) refundMap.set(t.linkId, r2((refundMap.get(t.linkId) || 0) + t.amount));
+}
+function allStored() { return Object.values(S.months).flat(); }
+
+/* ---------- Opslag ---------- */
+let db = null, base = null, storeMode = "none";
+const dirty = new Set(), inflight = new Set();
+const lastSaved = new Map();
+const LS_KEY = "budgetbeheer-v1";
+
+function docBodies() {
+  const m = new Map();
+  m.set("settings", S.settings);
+  for (const [k, list] of Object.entries(S.months)) if (list.length) m.set("m-" + k, { tx: list });
+  return m;
+}
+function persist() {
+  if (demo) return;
+  const bodies = docBodies();
+  const ids = new Set([...bodies.keys(), ...lastSaved.keys()]);
+  for (const id of ids) {
+    const b = bodies.get(id);
+    const j = b ? JSON.stringify(b) : null;
+    if (j !== (lastSaved.get(id) ?? null)) {
+      if (j === null) lastSaved.delete(id); else lastSaved.set(id, j);
+      if (storeMode === "db") { dirty.add(id); if (!inflight.has(id)) runWrite(id); }
+    }
+  }
+  if (storeMode === "local") {
+    try { localStorage.setItem(LS_KEY, JSON.stringify(R)); } catch (e) { /* niet beschikbaar */ }
+  }
+}
+async function runWrite(id) {
+  inflight.add(id);
+  while (dirty.has(id)) {
+    dirty.delete(id);
+    const j = lastSaved.get(id);
+    const ref = db.collection(base).doc(id);
+    try {
+      if (j == null) await ref.delete(); else await ref.set(JSON.parse(j));
+    } catch (e) {
+      if (e && e.code === "unavailable") {
+        await new Promise(r => setTimeout(r, 600 + Math.random() * 800));
+        dirty.add(id);
+      } else if (e && e.code === "quota_exceeded") {
+        toast("Opslaan mislukt: de opslag is vol. Verwijder oude transacties.");
+      } else {
+        toast("Opslaan mislukt. Probeer het later opnieuw.");
+      }
+    }
+  }
+  inflight.delete(id);
+}
+function onSnap(snap) {
+  const seen = new Set();
+  for (const d of snap.docs) {
+    seen.add(d.id);
+    if (dirty.has(d.id) || inflight.has(d.id)) continue;
+    const data = d.data();
+    if (d.id === "settings") R.settings = normalizeSettings(data);
+    else if (d.id.startsWith("m-")) R.months[d.id.slice(2)] = Array.isArray(data.tx) ? data.tx.slice() : [];
+    lastSaved.set(d.id, JSON.stringify(d.id === "settings" ? R.settings : { tx: R.months[d.id.slice(2)] }));
+  }
+  if (!snap.metadata.fromCache) {
+    for (const id of [...lastSaved.keys()]) {
+      if (seen.has(id) || dirty.has(id) || inflight.has(id)) continue;
+      lastSaved.delete(id);
+      if (id === "settings") R.settings = defaultSettings(); else delete R.months[id.slice(2)];
+    }
+  }
+  if (!loaded && !snap.metadata.fromCache) {
+    loaded = true;
+    if (snap.empty) startDemo();
+  }
+  render();
+}
+
+async function initStore() {
+  let user = null;
+  try {
+    if (window.claude && typeof window.claude.use === "function") {
+      [db, user] = await Promise.all([window.claude.use("db"), window.claude.use("user")]);
+    }
+  } catch (e) { db = null; }
+  let id = null;
+  if (db && user) { try { id = await user.id(); } catch (e) { id = null; } }
+  if (db && id) {
+    storeMode = "db";
+    base = "data/users/" + id;
+    document.getElementById("storeNote").textContent = "Privé opgeslagen in je account";
+    const timer = setTimeout(() => {
+      if (!loaded) { document.getElementById("storeNote").textContent = "Gegevens nog niet bereikbaar…"; }
+    }, 10000);
+    db.collection(base).onSnapshot(snap => { if (!snap.metadata.fromCache) clearTimeout(timer); onSnap(snap); },
+      err => {
+        clearTimeout(timer);
+        document.getElementById("storeNote").textContent = "Opslag niet bereikbaar, wijzigingen worden niet bewaard";
+        storeMode = "none";
+        if (!loaded) { loaded = true; startDemo(); render(); }
+      });
+  } else {
+    storeMode = "local";
+    let raw = null;
+    try { raw = localStorage.getItem(LS_KEY); } catch (e) { storeMode = "none"; }
+    if (raw) {
+      try { const p = JSON.parse(raw); R = S = { settings: normalizeSettings(p.settings), months: p.months || {} }; } catch (e) { /* negeren */ }
+    }
+    document.getElementById("storeNote").textContent = storeMode === "local" ? "Opgeslagen in deze browser" : "Wijzigingen worden niet bewaard";
+    loaded = true;
+    if (!raw) startDemo();
+    render();
+  }
+}
+
+/* ---------- Voorbeelddata ---------- */
+function startDemo() {
+  demo = true;
+  let seed = 7;
+  const rnd = () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; };
+  const settings = defaultSettings();
+  const now = new Date();
+  const s0 = new Date(now.getFullYear(), now.getMonth() - 3, 1);
+  settings.recurring = [
+    { id: "d1", type: "in", amount: 2650, cat: "Loon", desc: "Nettoloon", freq: "month", start: ds(new Date(s0.getFullYear(), s0.getMonth(), 25)) },
+    { id: "d2", type: "in", amount: 182.5, cat: "Groeipakket", desc: "Groeipakket", freq: "month", start: ds(new Date(s0.getFullYear(), s0.getMonth(), 10)) },
+    { id: "d3", type: "out", amount: 875, cat: "Wonen", desc: "Huur", freq: "month", start: ds(new Date(s0.getFullYear(), s0.getMonth(), 1)) },
+    { id: "d4", type: "out", amount: 145, cat: "Energie & water", desc: "Voorschot energie", freq: "month", start: ds(new Date(s0.getFullYear(), s0.getMonth(), 5)) },
+    { id: "d5", type: "out", amount: 13.99, cat: "Abonnementen", desc: "Streamingdienst", freq: "month", start: ds(new Date(s0.getFullYear(), s0.getMonth(), 12)) },
+    { id: "d6", type: "out", amount: 150, cat: "Sparen", desc: "Spaarrekening", freq: "month", start: ds(new Date(s0.getFullYear(), s0.getMonth(), 26)) }
+  ];
+  settings.budgets = { "Boodschappen": 420, "Vrije tijd": 150, "Kleding": 100, "Vervoer": 140, "Gezondheid": 60 };
+  const months = {};
+  const add = (date, type, amount, cat, desc, linkId) => { const k = ym(date); const id = uid() + Math.floor(rnd() * 1e6); const t = { id, date, type, amount: r2(amount), cat, desc }; if (linkId) t.linkId = linkId; (months[k] = months[k] || []).push(t); return id; };
+  const end = todayS();
+  const shops = ["Delhaize", "Colruyt", "Aldi", "Lidl", "Bakker"];
+  for (let d = new Date(s0); ds(d) <= end; d = addDays(d, 1)) {
+    const date = ds(d), wd = (d.getDay() + 6) % 7;
+    if (wd === 5 || rnd() < 0.18) add(date, "out", 25 + rnd() * 70, "Boodschappen", shops[Math.floor(rnd() * shops.length)]);
+    if (wd < 5 && rnd() < 0.12) add(date, "out", 35 + rnd() * 30, "Vervoer", rnd() < 0.5 ? "Tanken" : "Treinticket");
+    if (wd >= 4 && rnd() < 0.3) add(date, "out", 12 + rnd() * 45, "Vrije tijd", ["Restaurant", "Cinema", "Café", "Zwembad"][Math.floor(rnd() * 4)]);
+    if (rnd() < 0.04) add(date, "out", 25 + rnd() * 70, "Kleding", "Kleding");
+    if (rnd() < 0.03) add(date, "out", 15 + rnd() * 40, "Gezondheid", "Apotheek");
+    if (d.getDate() === 15 && rnd() < 0.7) add(date, "out", 38.6, "Verzekeringen", "Familiale verzekering");
+    if (d.getDate() === 3) { const id = add(date, "out", 60, "Gezondheid", "Tandarts"); const back = addDays(d, 6); if (ds(back) <= end) add(ds(back), "refund", 45, "Gezondheid", "Terugbetaling mutualiteit", id); }
+  }
+  S = { settings, months };
+}
+const realEmpty = () => !Object.keys(R.months).length && !R.settings.recurring.length;
+function endDemo(keep) {
+  if (!demo) return;
+  demo = false;
+  if (keep && realEmpty()) { R.settings = S.settings; R.months = S.months; }
+  S = R;
+  persist();
+  render();
+}
+function mutate(fn) {
+  if (demo) { demo = false; S = R; }
+  fn();
+  R = S;
+  persist();
+  render();
+}
+
+/* ---------- Navigatie ---------- */
+const TABS = ["week", "maand", "jaar", "transacties", "instellingen"];
+let tab = "maand";
+let anchor = new Date();
+function readHash() {
+  const h = location.hash.replace("#", "");
+  tab = TABS.includes(h) ? h : "maand";
+}
+window.addEventListener("hashchange", () => { readHash(); render(); });
+
+/* ---------- Grafieken ---------- */
+const charts = {};
+function cssVar(n) { return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
+function destroyCharts() { for (const k of Object.keys(charts)) { charts[k].destroy(); delete charts[k]; } }
+function baseChartOpts() {
+  const muted = cssVar("--muted"), line = cssVar("--line"), ink = cssVar("--ink");
+  return {
+    responsive: true, maintainAspectRatio: false, animation: false,
+    interaction: { mode: "index", intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: cssVar("--surface"), titleColor: ink, bodyColor: ink, borderColor: line, borderWidth: 1,
+        padding: 10, boxPadding: 4, usePointStyle: true,
+        callbacks: { label: c => " " + (c.dataset.label ? c.dataset.label + ": " : "") + fmt(c.parsed.y ?? c.parsed.x) }
+      }
+    },
+    scales: {
+      x: { grid: { display: false }, border: { color: line }, ticks: { color: muted } },
+      y: { beginAtZero: true, grid: { color: line }, border: { display: false }, ticks: { color: muted, maxTicksLimit: 5, callback: v => "€ " + Number(v).toLocaleString("nl-BE") } }
+    }
+  };
+}
+function barChart(id, labels, incData, outData, onClick) {
+  if (typeof Chart === "undefined") { const c = document.getElementById(id); if (c) c.parentElement.innerHTML = `<div class="empty">De grafiek kon niet laden. De cijfers staan in de lijst hieronder.</div>`; return; }
+  const el = document.getElementById(id); if (!el) return;
+  const ds_ = (label, data, color) => ({ label, data, backgroundColor: color, borderRadius: { topLeft: 4, topRight: 4 }, borderSkipped: "bottom", maxBarThickness: 26, categoryPercentage: 0.7, barPercentage: 0.92 });
+  const opts = baseChartOpts();
+  if (onClick) { opts.onClick = (e, els) => { if (els.length) onClick(els[0].index); }; opts.onHover = (e, els) => { e.native.target.style.cursor = els.length ? "pointer" : "default"; }; }
+  charts[id] = new Chart(el, { type: "bar", data: { labels, datasets: [ds_("Inkomsten", incData, cssVar("--s-in")), ds_("Uitgaven", outData, cssVar("--s-out"))] }, options: opts });
+}
+function catChart(id, rows) {
+  if (typeof Chart === "undefined") { const c = document.getElementById(id); if (c) c.parentElement.innerHTML = `<div class="empty">De grafiek kon niet laden. De cijfers staan in de lijst hieronder.</div>`; return; }
+  const el = document.getElementById(id); if (!el) return;
+  const opts = baseChartOpts();
+  opts.indexAxis = "y";
+  opts.interaction = { mode: "nearest", axis: "y", intersect: false };
+  opts.scales = {
+    x: { beginAtZero: true, grid: { color: cssVar("--line") }, border: { display: false }, ticks: { color: cssVar("--muted"), maxTicksLimit: 5, callback: v => "€ " + Number(v).toLocaleString("nl-BE") } },
+    y: { grid: { display: false }, border: { color: cssVar("--line") }, ticks: { color: cssVar("--ink") } }
+  };
+  opts.plugins.tooltip.callbacks.label = c => " " + fmt(c.parsed.x);
+  charts[id] = new Chart(el, { type: "bar", data: { labels: rows.map(r => r[0]), datasets: [{ data: rows.map(r => r[1]), backgroundColor: cssVar("--s-seq"), borderRadius: { topRight: 4, bottomRight: 4 }, borderSkipped: "left", maxBarThickness: 18 }] }, options: opts });
+}
+const legendHTML = () => `<div class="legend"><span style="--c:var(--s-in)">Inkomsten</span><span style="--c:var(--s-out)">Uitgaven</span></div>`;
+
+/* ---------- Weergave-onderdelen ---------- */
+function tilesHTML(t, extra) {
+  if (t.ref) { extra = { ...(extra || {}) }; extra.out = "Na " + fmt(t.ref) + " terugbetalingen" + (extra.out ? " · " + extra.out : ""); }
+  return `<div class="tiles">
+    <div class="tile"><div class="k">Inkomsten</div><div class="v pos">${fmt(t.inc)}</div>${extra && extra.inc ? `<div class="sub">${extra.inc}</div>` : ""}</div>
+    <div class="tile"><div class="k">Uitgaven</div><div class="v neg">${fmt(t.out)}</div>${extra && extra.out ? `<div class="sub">${extra.out}</div>` : ""}</div>
+    <div class="tile saldo"><div class="k">Saldo</div><div class="v ${t.saldo < 0 ? "neg" : "pos"}">${t.saldo > 0 ? "+" : ""}${fmt(t.saldo)}</div>${extra && extra.saldo ? `<div class="sub">${extra.saldo}</div>` : ""}</div>
+  </div>`;
+}
+function txRow(t, showDate) {
+  const d = pd(t.date);
+  const meta = [showDate ? d.getDate() + " " + MON_S[d.getMonth()] + " " + d.getFullYear() : null, t.cat].filter(Boolean).join(" · ");
+  return `<div class="row" data-tx="${esc(t.id)}" tabindex="0" role="button">
+    <div><div class="t">${esc(t.desc || t.cat)}${t.date > todayS() ? `<span class="chip">gepland</span>` : ""}${t.type === "refund" ? `<span class="chip">terugbetaling</span>` : ""}${t.type === "out" && refundMap.get(t.id) ? `<span class="chip" title="Netto ${fmt(t.amount - refundMap.get(t.id))}">${fmt(refundMap.get(t.id))} terugbetaald</span>` : ""}${t.recurring ? `<span class="chip" title="Terugkerend">↻ ${S.settings.recurring.find(r => r.id === t.ruleId)?.freq === "week" ? "wekelijks" : "maandelijks"}</span>` : ""}</div><div class="m">${esc(meta)}</div></div>
+    <div class="a ${t.type === "out" ? "neg" : "pos"}">${t.type === "out" ? "−" : "+"}${fmt(t.amount)}</div>
+  </div>`;
+}
+function periodNav(label) {
+  return `<div class="period">
+    <button class="btn icon" data-nav="-1" aria-label="Vorige periode">‹</button>
+    <button class="btn icon" data-nav="1" aria-label="Volgende periode">›</button>
+    <div class="label">${label}</div>
+    <button class="btn" data-nav="0">Vandaag</button>
+  </div>`;
+}
+
+function viewWeek() {
+  const ws = startOfWeek(anchor), we = addDays(ws, 6);
+  const from = ds(ws), to = ds(we);
+  const list = getRange(from, to);
+  const t = totals(list);
+  const sameMonth = ws.getMonth() === we.getMonth();
+  const label = `Week ${isoWeek(ws)} · ${ws.getDate()}${sameMonth ? "" : " " + MON_S[ws.getMonth()]}–${we.getDate()} ${MON_S[we.getMonth()]} ${we.getFullYear()}`;
+  const inc = Array(7).fill(0), out = Array(7).fill(0);
+  for (const x of list) { const i = (pd(x.date).getDay() + 6) % 7; if (x.type === "in") inc[i] += x.amount; else if (x.type === "refund") out[i] -= x.amount; else out[i] += x.amount; }
+  let days = "";
+  for (let i = 0; i < 7; i++) {
+    const d = addDays(ws, i), key = ds(d);
+    const items = list.filter(x => x.date === key);
+    const dt = totals(items);
+    days += `<div class="day-h"><span>${DAYS[i]} ${d.getDate()} ${MON_S[d.getMonth()]}</span><span>${items.length ? (dt.saldo >= 0 ? "+" : "−") + fmt(Math.abs(dt.saldo)) : ""}</span></div>`;
+    days += items.length ? items.map(x => txRow(x, false)).join("") : `<div class="empty">Geen transacties</div>`;
+  }
+  return periodNav(label) + tilesHTML(t, { out: `Gemiddeld ${fmt(t.out / 7)} per dag` }) +
+    `<div class="card"><h2>Per dag</h2>${legendHTML()}<div class="chart-box"><canvas id="cWeek" aria-label="Inkomsten en uitgaven per dag"></canvas></div></div>
+     <div class="card"><h2>Transacties deze week</h2><div class="list">${days}</div></div>` +
+    (pendingCharts.push(["week", { inc: inc.map(r2), out: out.map(r2) }]), "");
+}
+
+function catTotals(list, type) {
+  const m = new Map();
+  for (const t of list) {
+    if (t.type === type) m.set(t.cat, (m.get(t.cat) || 0) + t.amount);
+    else if (type === "out" && t.type === "refund") m.set(t.cat, (m.get(t.cat) || 0) - t.amount);
+  }
+  return [...m.entries()].map(([k, v]) => [k, r2(v)]).filter(r => r[1] !== 0).sort((a, b) => b[1] - a[1]);
+}
+function budgetStatus(spent, budget) {
+  const p = budget > 0 ? spent / budget : 0;
+  if (p > 1) return { c: "var(--crit)", label: "✕ Overschreden", p };
+  if (p >= 0.8) return { c: "var(--warn)", label: "! Bijna op", p };
+  return { c: "var(--good)", label: "✓ Op schema", p };
+}
+function viewMonth() {
+  const y = anchor.getFullYear(), m = anchor.getMonth();
+  const from = ds(new Date(y, m, 1)), to = ds(new Date(y, m, dim(y, m)));
+  const list = getRange(from, to);
+  const t = totals(list);
+  const prev = totals(getRange(ds(new Date(y, m - 1, 1)), ds(new Date(y, m, 0))));
+  const diff = r2(t.out - prev.out);
+  const cats = catTotals(list, "out");
+  const budgets = Object.entries(S.settings.budgets).filter(([c, b]) => b > 0 && S.settings.cats.out.includes(c));
+  const spentBy = Object.fromEntries(cats);
+  let bHTML = budgets.length ? budgets.map(([c, b]) => {
+    const sp = spentBy[c] || 0, st = budgetStatus(sp, b);
+    return `<div class="budget" style="--st:${st.c}"><div class="top"><b>${esc(c)}</b><span class="nums">${fmt(sp)} / ${fmt(b)}</span></div>
+      <div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(st.p * 100)}" aria-label="${esc(c)}"><i style="width:${Math.min(100, st.p * 100).toFixed(1)}%"></i></div>
+      <div class="top"><span class="status">${st.label}</span><span class="nums">${sp <= b ? "Nog " + fmt(b - sp) : fmt(sp - b) + " te veel"} · ${Math.round(st.p * 100)}%</span></div></div>`;
+  }).join("") : `<div class="empty">Nog geen budgetten. Stel ze in bij <a href="#instellingen">Instellingen</a>.</div>`;
+  const incCats = catTotals(list, "in");
+  return periodNav(MONTHS[m].replace(/^./, c => c.toUpperCase()) + " " + y) +
+    tilesHTML(t, { out: prev.out ? (diff > 0 ? "▲ " : diff < 0 ? "▼ " : "") + fmt(Math.abs(diff)) + (diff > 0 ? " meer" : diff < 0 ? " minder" : "") + " dan vorige maand" : "", inc: incCats.slice(0, 2).map(c => esc(c[0]) + " " + fmt(c[1])).join(" · ") }) +
+    `<div class="grid2">
+      <div class="card"><h2>Uitgaven per categorie</h2>${cats.length ? `<div class="chart-box" style="height:${Math.max(160, cats.length * 32 + 40)}px"><canvas id="cCats" aria-label="Uitgaven per categorie"></canvas></div>` : `<div class="empty">Geen uitgaven deze maand.</div>`}</div>
+      <div class="card"><h2>Budgetten</h2>${bHTML}</div>
+    </div>
+    <div class="card"><h2>Transacties (${list.length})</h2><div class="list">${list.length ? list.map(x => txRow(x, true)).join("") : `<div class="empty">Geen transacties deze maand.</div>`}</div></div>` +
+    (pendingCharts.push(["cats", cats]), "");
+}
+
+function viewYear() {
+  const y = anchor.getFullYear();
+  const list = getRange(y + "-01-01", y + "-12-31");
+  const t = totals(list);
+  const rows = [];
+  for (let m = 0; m < 12; m++) {
+    const k = y + "-" + pad(m + 1);
+    rows.push({ m, ...totals(list.filter(x => ym(x.date) === k)) });
+  }
+  const now = new Date();
+  const nMonths = y < now.getFullYear() ? 12 : y > now.getFullYear() ? 0 : now.getMonth() + 1;
+  const avgIn = nMonths ? t.inc / nMonths : 0, avgOut = nMonths ? t.out / nMonths : 0;
+  const cats = catTotals(list, "out");
+  const catRows = cats.map(([c, v]) => `<tr><td>${esc(c)}</td><td>${fmt(v)}</td><td>${nMonths ? fmt(v / nMonths) : "–"}</td><td>${t.out ? Math.round(v / t.out * 100) : 0}%</td></tr>`).join("");
+  return periodNav(String(y)) +
+    tilesHTML(t, { inc: nMonths ? "Gemiddeld " + fmt(avgIn) + " per maand" : "", out: nMonths ? "Gemiddeld " + fmt(avgOut) + " per maand" : "", saldo: nMonths ? "Gemiddeld " + fmt(t.saldo / nMonths) + " per maand" : "" }) +
+    `<div class="card"><h2>Per maand</h2>${legendHTML()}<div class="chart-box"><canvas id="cYear" aria-label="Inkomsten en uitgaven per maand"></canvas></div></div>
+     <div class="card"><h2>Overzicht per maand</h2><div class="scroll-x"><table>
+      <thead><tr><th>Maand</th><th>Inkomsten</th><th>Uitgaven</th><th>Saldo</th></tr></thead>
+      <tbody>${rows.map(r => `<tr class="click" data-month="${r.m}" tabindex="0"><td style="text-transform:capitalize">${MONTHS[r.m]}</td><td>${fmt(r.inc)}</td><td>${fmt(r.out)}</td><td class="${r.saldo < 0 ? "neg" : r.saldo > 0 ? "pos" : ""}">${fmt(r.saldo)}</td></tr>`).join("")}</tbody>
+      <tfoot><tr><td>Totaal</td><td>${fmt(t.inc)}</td><td>${fmt(t.out)}</td><td class="${t.saldo < 0 ? "neg" : "pos"}">${fmt(t.saldo)}</td></tr></tfoot>
+     </table></div></div>
+     <div class="card"><h2>Uitgaven per categorie</h2>${cats.length ? `<div class="scroll-x"><table><thead><tr><th>Categorie</th><th>Totaal</th><th>Per maand</th><th>Aandeel</th></tr></thead><tbody>${catRows}</tbody></table></div>` : `<div class="empty">Geen uitgaven dit jaar.</div>`}</div>` +
+    (pendingCharts.push(["year", { inc: rows.map(r => r.inc), out: rows.map(r => r.out) }]), "");
+}
+
+let txFilter = { q: "", type: "", cat: "", limit: 150 };
+function viewTx() {
+  let list = allStored().slice().sort((a, b) => a.date < b.date ? 1 : a.date > b.date ? -1 : 0);
+  const q = txFilter.q.toLowerCase();
+  if (q) list = list.filter(t => (t.desc || "").toLowerCase().includes(q) || t.cat.toLowerCase().includes(q) || String(t.amount).includes(q));
+  if (txFilter.type) list = list.filter(t => t.type === txFilter.type);
+  if (txFilter.cat) list = list.filter(t => t.cat === txFilter.cat);
+  const allCats = [...new Set([...S.settings.cats.out, ...S.settings.cats.in])];
+  const shown = list.slice(0, txFilter.limit);
+  return `<div class="period"><div class="label">Alle transacties</div>
+      <button class="btn" data-act="import">CSV importeren</button>
+      <button class="btn" data-act="export">CSV exporteren</button></div>
+    <div class="card">
+      <div class="toolbar">
+        <input type="search" id="fq" placeholder="Zoek op omschrijving, categorie of bedrag" value="${esc(txFilter.q)}" aria-label="Zoeken">
+        <select id="ft" aria-label="Type"><option value="">Alle types</option><option value="in" ${txFilter.type === "in" ? "selected" : ""}>Inkomsten</option><option value="out" ${txFilter.type === "out" ? "selected" : ""}>Uitgaven</option><option value="refund" ${txFilter.type === "refund" ? "selected" : ""}>Terugbetalingen</option></select>
+        <select id="fc" aria-label="Categorie"><option value="">Alle categorieën</option>${allCats.map(c => `<option ${txFilter.cat === c ? "selected" : ""}>${esc(c)}</option>`).join("")}</select>
+      </div>
+      <p class="hint">${list.length} transacties${list.length ? ", samen " + (() => { const t = totals(list); return "+" + fmt(t.inc) + " / −" + fmt(t.out) + (t.ref ? " netto" : ""); })() : ""}. Terugkerende transacties beheer je bij <a href="#instellingen">Instellingen</a>.</p>
+      <div class="list">${shown.length ? shown.map(x => txRow(x, true)).join("") : `<div class="empty">Geen transacties gevonden.</div>`}</div>
+      ${list.length > shown.length ? `<div style="padding-top:12px"><button class="btn" data-act="more">Toon meer (${list.length - shown.length} resterend)</button></div>` : ""}
+    </div>`;
+}
+
+function viewSettings() {
+  const catBlock = type => `<div class="cat-list">${S.settings.cats[type].map((c, i) => `
+      <div class="cat-item"><input value="${esc(c)}" data-rename="${type}:${i}" aria-label="Naam categorie ${esc(c)}">
+      <button class="btn small" data-act="rename" data-k="${type}:${i}">Hernoem</button>
+      <button class="btn small danger" data-act="delcat" data-k="${type}:${i}" aria-label="Verwijder ${esc(c)}">Verwijder</button></div>`).join("")}
+      <div class="cat-item"><input id="newcat-${type}" placeholder="Nieuwe categorie" aria-label="Nieuwe categorie"><button class="btn small primary" data-act="addcat" data-k="${type}">Voeg toe</button><span></span></div>
+    </div>`;
+  const rec = S.settings.recurring.slice().sort((a, b) => (a.type === b.type ? b.amount - a.amount : a.type === "in" ? -1 : 1));
+  return `<div class="period"><div class="label">Instellingen</div></div>
+    <div class="grid2">
+      <div class="card"><h2>Maandbudgetten</h2><p class="hint">Laat leeg voor geen budget.</p>
+        ${S.settings.cats.out.map((c, i) => `<div class="budget-item"><label for="b-${i}">${esc(c)}</label><input id="b-${i}" inputmode="decimal" data-budget="${esc(c)}" value="${S.settings.budgets[c] ? NUM.format(S.settings.budgets[c]) : ""}" placeholder="—"></div>`).join("")}
+        <div style="padding-top:10px"><button class="btn primary" data-act="savebudgets">Budgetten opslaan</button></div>
+      </div>
+      <div class="card"><h2>Terugkerende transacties</h2><p class="hint">Voeg ze toe met de + knop en vink ‘Terugkerend’ aan.</p>
+        <div class="list">${rec.length ? rec.map(r => `<div class="row" data-rule="${esc(r.id)}" tabindex="0" role="button"><div><div class="t">${esc(r.desc || r.cat)}</div><div class="m">${r.freq === "week" ? "Wekelijks op " + DAYS[(pd(r.start).getDay() + 6) % 7] : "Maandelijks op de " + pd(r.start).getDate() + "e"} · ${esc(r.cat)}${r.end ? " · tot " + esc(r.end) : ""}</div></div><div class="a ${r.type === "out" ? "neg" : "pos"}">${r.type === "out" ? "−" : "+"}${fmt(r.amount)}</div></div>`).join("") : `<div class="empty">Nog geen terugkerende transacties.</div>`}</div>
+      </div>
+    </div>
+    <div class="grid2">
+      <div class="card"><h2>Categorieën uitgaven</h2>${catBlock("out")}</div>
+      <div class="card"><h2>Categorieën inkomsten</h2>${catBlock("in")}</div>
+    </div>
+    <div class="card"><h2>Gegevens</h2><p class="hint">Een back-up bevat alle transacties, categorieën, budgetten en terugkerende transacties.</p>
+      <div class="toolbar">
+        <button class="btn" data-act="backup">Back-up maken</button>
+        <button class="btn" data-act="restore">Back-up terugzetten</button>
+        <button class="btn" data-act="demo">Voorbeelddata bekijken</button>
+        <button class="btn danger" data-act="wipe">Alles wissen</button>
+      </div>
+    </div>`;
+}
+
+/* ---------- Render ---------- */
+function render() {
+  readHash();
+  document.querySelectorAll("#tabs a").forEach(a => { if (a.getAttribute("href") === "#" + tab) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current"); });
+  document.getElementById("bannerSlot").innerHTML = demo && loaded ? `<div class="banner"><p><b>Je bekijkt voorbeelddata.</b> Zo zie je hoe de overzichten werken. Zodra je zelf een transactie toevoegt, verdwijnen de voorbeelden${realEmpty() ? "" : " en zie je opnieuw je eigen gegevens"}.</p><div class="acts">${realEmpty() ? `<button class="btn" data-act="demo-keep">Voorbeelden bewaren</button>` : ""}<button class="btn primary" data-act="demo-clear">${realEmpty() ? "Wis voorbeelden" : "Terug naar mijn gegevens"}</button></div></div>` : "";
+  if (!loaded) return;
+  destroyCharts();
+  const main = document.getElementById("main");
+  const active = document.activeElement && document.activeElement.id;
+  const selStart = active === "fq" ? document.activeElement.selectionStart : null;
+  pendingCharts = [];
+  buildRefundMap();
+  main.innerHTML = tab === "week" ? viewWeek() : tab === "jaar" ? viewYear() : tab === "transacties" ? viewTx() : tab === "instellingen" ? viewSettings() : viewMonth();
+  pendingCharts.forEach(([k, d]) => {
+    if (k === "week") barChart("cWeek", DAYS_S.map((x, i) => x + " " + addDays(startOfWeek(anchor), i).getDate()), d.inc, d.out);
+    if (k === "year") barChart("cYear", MON_S, d.inc, d.out, i => { anchor = new Date(anchor.getFullYear(), i, 1); location.hash = "maand"; });
+    if (k === "cats" && d.length) catChart("cCats", d);
+  });
+  if (active === "fq") { const f = document.getElementById("fq"); f.focus(); if (selStart != null) f.setSelectionRange(selStart, selStart); }
+}
+
+/* ---------- Dialogen ---------- */
+const dlg = document.getElementById("dlg"), dlgBody = document.getElementById("dlgBody");
+function openDlg(html) { dlgBody.innerHTML = html; if (!dlg.open) dlg.showModal(); }
+function closeDlg() { if (dlg.open) dlg.close(); }
+dlg.addEventListener("click", e => { if (e.target === dlg) closeDlg(); });
+function confirmDlg(title, text, okLabel) {
+  return new Promise(res => {
+    openDlg(`<div class="dlg"><h3>${esc(title)}</h3><p style="margin:0">${text}</p><div class="acts"><button class="btn" id="cNo">Annuleren</button><button class="btn primary" id="cYes">${esc(okLabel)}</button></div></div>`);
+    const done = v => { dlg.removeEventListener("close", onClose); closeDlg(); res(v); };
+    const onClose = () => res(false);
+    dlg.addEventListener("close", onClose, { once: true });
+    document.getElementById("cNo").onclick = () => done(false);
+    document.getElementById("cYes").onclick = () => done(true);
+  });
+}
+
+let form = null; // { mode: 'new'|'tx'|'rule', id, type }
+function openTxForm(opts) {
+  opts = opts || {};
+  let t = { type: "out", amount: "", date: todayS(), cat: "", desc: "", rec: false, freq: "month", end: "" };
+  let mode = "new", id = null;
+  if (opts.tx) { mode = "tx"; id = opts.tx.id; t = { ...t, ...opts.tx, amount: NUM.format(opts.tx.amount) }; }
+  if (opts.rule) { const r = opts.rule; mode = "rule"; id = r.id; t = { type: r.type, amount: NUM.format(r.amount), date: r.start, cat: r.cat, desc: r.desc || "", rec: true, freq: r.freq, end: r.end || "" }; }
+  if (opts.date) t.date = opts.date;
+  if (opts.refundFor) { const x = opts.refundFor; t = { ...t, type: "refund", cat: x.cat, desc: "Terugbetaling " + (x.desc || x.cat), linkId: x.id }; }
+  form = { mode, id, type: t.type };
+  const title = mode === "new" ? (t.type === "refund" ? "Nieuwe terugbetaling" : "Nieuwe transactie") : mode === "rule" ? "Terugkerende transactie" : "Transactie bewerken";
+  openDlg(`<form class="dlg" id="txForm" novalidate>
+    <h3>${title}</h3>
+    <div class="seg" role="group" aria-label="Type"><button type="button" class="out" data-type="out" aria-pressed="${t.type === "out"}">Uitgave</button><button type="button" class="in" data-type="in" aria-pressed="${t.type === "in"}">Inkomst</button><button type="button" class="refund" data-type="refund" aria-pressed="${t.type === "refund"}">Terugbetaling</button></div>
+    <p class="hint" id="refHint" style="margin:0" ${t.type === "refund" ? "" : "hidden"}>Een terugbetaling (bv. van de mutualiteit) wordt afgetrokken van je uitgaven in die categorie.</p>
+    <div class="field"><label for="fAmount">Bedrag (€)</label><input id="fAmount" class="amount-input" inputmode="decimal" autocomplete="off" placeholder="0,00" value="${esc(t.amount)}"></div>
+    <div class="two">
+      <div class="field"><label for="fDate" id="fDateL">${t.rec ? "Startdatum" : "Datum"}</label><input id="fDate" type="date" value="${esc(t.date)}"></div>
+      <div class="field"><label for="fCat">Categorie</label><select id="fCat"></select></div>
+    </div>
+    <div class="field" id="linkBox" ${t.type === "refund" ? "" : "hidden"}><label for="fLink">Hoort bij uitgave (optioneel)</label><select id="fLink"></select></div>
+    <div class="field"><label for="fDesc">Omschrijving (optioneel)</label><input id="fDesc" autocomplete="off" value="${esc(t.desc)}" placeholder="bv. Delhaize, huur, tankbeurt"></div>
+    <label class="check"><input type="checkbox" id="fRec" ${t.rec ? "checked" : ""}> Terugkerend</label>
+    <div class="two" id="recBox" ${t.rec ? "" : "hidden"}>
+      <div class="field"><label for="fFreq">Herhaling</label><select id="fFreq"><option value="month" ${t.freq === "month" ? "selected" : ""}>Maandelijks</option><option value="week" ${t.freq === "week" ? "selected" : ""}>Wekelijks</option></select></div>
+      <div class="field"><label for="fEnd">Einddatum (optioneel)</label><input id="fEnd" type="date" value="${esc(t.end)}"></div>
+    </div>
+    <div class="err" id="fErr" role="alert"></div>
+    <div class="acts">
+      ${mode !== "new" ? `<button type="button" class="btn danger left" id="fDel">Verwijderen</button>` : ""}
+      ${mode === "tx" && t.type === "out" ? `<button type="button" class="btn" id="fRefund">Terugbetaling toevoegen</button>` : ""}
+      <button type="button" class="btn" id="fCancel">Annuleren</button>
+      <button type="submit" class="btn primary">Opslaan</button>
+    </div>
+  </form>`);
+  const fillLinks = sel => {
+    const el = document.getElementById("fLink");
+    if (form.type !== "refund") { el.innerHTML = ""; return; }
+    const cat = document.getElementById("fCat").value;
+    const ref = document.getElementById("fDate").value || todayS();
+    const lo = ds(addDays(pd(ref), -180));
+    const opts = allStored().filter(x => x.type === "out" && x.cat === cat && x.date <= ref && x.date >= lo).sort((a, b) => a.date < b.date ? 1 : -1).slice(0, 40);
+    if (sel && !opts.some(x => x.id === sel)) { const x = findTx(sel); if (x) opts.unshift(x); }
+    el.innerHTML = `<option value="">Geen</option>` + opts.map(x => { const d = pd(x.date); return `<option value="${esc(x.id)}" ${x.id === sel ? "selected" : ""}>${d.getDate()} ${MON_S[d.getMonth()]} · ${esc(x.desc || x.cat)} · ${fmt(x.amount)}</option>`; }).join("");
+  };
+  const fillCats = sel => {
+    const cats = S.settings.cats[catType(form.type)];
+    const el = document.getElementById("fCat");
+    el.innerHTML = cats.map(c => `<option ${c === sel ? "selected" : ""}>${esc(c)}</option>`).join("") + (sel && !cats.includes(sel) ? `<option selected>${esc(sel)}</option>` : "");
+    fillLinks(t.linkId);
+  };
+  fillCats(t.cat);
+  document.getElementById("fCat").onchange = () => fillLinks(null);
+  document.getElementById("fDate").onchange = () => fillLinks(document.getElementById("fLink").value);
+  dlgBody.querySelectorAll(".seg button").forEach(b => b.onclick = () => {
+    const prevCatType = catType(form.type);
+    form.type = b.dataset.type;
+    dlgBody.querySelectorAll(".seg button").forEach(x => x.setAttribute("aria-pressed", x === b));
+    document.getElementById("linkBox").hidden = form.type !== "refund";
+    document.getElementById("refHint").hidden = form.type !== "refund";
+    if (prevCatType !== catType(form.type)) fillCats(null); else fillLinks(null);
+  });
+  const fRefund = document.getElementById("fRefund");
+  if (fRefund) fRefund.onclick = () => { const x = findTx(form.id); if (x) openTxForm({ refundFor: x }); };
+  document.getElementById("fRec").onchange = e => {
+    document.getElementById("recBox").hidden = !e.target.checked;
+    document.getElementById("fDateL").textContent = e.target.checked ? "Startdatum" : "Datum";
+  };
+  document.getElementById("fCancel").onclick = closeDlg;
+  const del = document.getElementById("fDel");
+  if (del) del.onclick = async () => {
+    const isRule = form.mode === "rule";
+    const f = { ...form };
+    const ok = await confirmDlg(isRule ? "Terugkerende transactie verwijderen?" : "Transactie verwijderen?", isRule ? "Alle herhalingen verdwijnen uit je overzichten, ook die in het verleden. Wil je enkel stoppen, stel dan een einddatum in." : "Dit kan je niet ongedaan maken.", "Verwijderen");
+    if (!ok) return;
+    mutate(() => {
+      if (isRule) S.settings.recurring = S.settings.recurring.filter(r => r.id !== f.id);
+      else { removeTx(f.id); for (const l of Object.values(S.months)) for (const x of l) if (x.linkId === f.id) delete x.linkId; }
+    });
+    toast("Verwijderd");
+  };
+  document.getElementById("txForm").onsubmit = e => {
+    e.preventDefault();
+    const amount = r2(parseAmount(document.getElementById("fAmount").value));
+    const date = document.getElementById("fDate").value;
+    const cat = document.getElementById("fCat").value;
+    const desc = document.getElementById("fDesc").value.trim();
+    const rec = document.getElementById("fRec").checked;
+    const freq = document.getElementById("fFreq").value;
+    const end = document.getElementById("fEnd").value;
+    const linkId = form.type === "refund" ? (document.getElementById("fLink").value || null) : null;
+    const err = document.getElementById("fErr");
+    if (!(amount > 0)) { err.textContent = "Vul een bedrag groter dan 0 in, bijvoorbeeld 12,50."; document.getElementById("fAmount").focus(); return; }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) { err.textContent = "Kies een datum."; return; }
+    if (rec && end && end < date) { err.textContent = "De einddatum ligt vóór de startdatum."; return; }
+    const f = { ...form };
+    closeDlg();
+    mutate(() => {
+      if (f.mode === "tx") removeTx(f.id);
+      if (f.mode === "rule") S.settings.recurring = S.settings.recurring.filter(r => r.id !== f.id);
+      if (rec) S.settings.recurring.push({ id: f.mode === "rule" ? f.id : uid(), type: f.type, amount, cat, desc, freq, start: date, end: end || null });
+      else addTx(Object.assign({ id: f.mode === "tx" ? f.id : uid(), date, type: f.type, amount, cat, desc }, linkId ? { linkId } : {}));
+    });
+    toast(f.mode === "new" ? "Toegevoegd" : "Opgeslagen");
+  };
+  setTimeout(() => document.getElementById("fAmount").focus(), 30);
+}
+function addTx(t) { const k = ym(t.date); (S.months[k] = S.months[k] || []).push(t); }
+function removeTx(id) {
+  for (const k of Object.keys(S.months)) {
+    const i = S.months[k].findIndex(t => t.id === id);
+    if (i >= 0) { S.months[k].splice(i, 1); if (!S.months[k].length) delete S.months[k]; return; }
+  }
+}
+function findTx(id) { for (const l of Object.values(S.months)) { const t = l.find(x => x.id === id); if (t) return t; } return null; }
+
+/* ---------- CSV & back-up ---------- */
+function csvCell(v) { const s = String(v ?? ""); return /[";\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }
+function buildCSV() {
+  const rows = [["datum", "type", "bedrag", "categorie", "omschrijving"]];
+  for (const t of allStored().sort((a, b) => a.date < b.date ? -1 : 1)) rows.push([t.date, t.type === "in" ? "inkomst" : t.type === "refund" ? "terugbetaling" : "uitgave", NUM.format(t.amount).replace(/\./g, ""), t.cat, t.desc || ""]);
+  return "﻿" + rows.map(r => r.map(csvCell).join(";")).join("\r\n");
+}
+async function offerFile(filename, data, title) {
+  try {
+    const dl = window.claude && await window.claude.use("downloads");
+    if (dl) { await dl.save({ filename, data }); return; }
+  } catch (e) { if (e && /declin|cancel|abort/i.test(String(e.code || e.message))) return; }
+  try {
+    const type = filename.endsWith(".json") ? "application/json" : "text/csv;charset=utf-8";
+    const url = URL.createObjectURL(new Blob([data], { type }));
+    const a = document.createElement("a");
+    a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    return;
+  } catch (e) { /* val terug op kopiëren */ }
+  openDlg(`<div class="dlg"><h3>${esc(title)}</h3><p class="hint" style="margin:0">Downloaden lukt hier niet. Kopieer de inhoud en bewaar ze als <b>${esc(filename)}</b>.</p><textarea id="dlText" readonly>${esc(data)}</textarea><div class="acts"><button class="btn" id="dlClose">Sluiten</button><button class="btn primary" id="dlCopy">Kopiëren</button></div></div>`);
+  document.getElementById("dlClose").onclick = closeDlg;
+  document.getElementById("dlCopy").onclick = async () => {
+    try { await navigator.clipboard.writeText(data); toast("Gekopieerd"); }
+    catch (e) { const ta = document.getElementById("dlText"); ta.select(); toast("Selecteer en kopieer met Ctrl+C"); }
+  };
+}
+function parseCSV(text) {
+  text = text.replace(/^﻿/, "");
+  const first = text.split(/\r?\n/)[0] || "";
+  const sep = [";", "\t", ","].map(s => [s, first.split(s).length]).sort((a, b) => b[1] - a[1])[0][0];
+  const rows = []; let row = [], cell = "", q = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (q) { if (c === '"') { if (text[i + 1] === '"') { cell += '"'; i++; } else q = false; } else cell += c; }
+    else if (c === '"') q = true;
+    else if (c === sep) { row.push(cell); cell = ""; }
+    else if (c === "\n" || c === "\r") { if (c === "\r" && text[i + 1] === "\n") i++; row.push(cell); rows.push(row); row = []; cell = ""; }
+    else cell += c;
+  }
+  if (cell || row.length) { row.push(cell); rows.push(row); }
+  return rows.filter(r => r.some(c => c.trim()));
+}
+function parseDate(s) {
+  s = String(s || "").trim();
+  let m;
+  if ((m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/))) return m[1] + "-" + pad(m[2]) + "-" + pad(m[3]);
+  if ((m = s.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{2,4})/))) { const y = m[3].length === 2 ? "20" + m[3] : m[3]; return y + "-" + pad(m[2]) + "-" + pad(m[1]); }
+  return null;
+}
+function importCSV(text) {
+  const rows = parseCSV(text);
+  if (!rows.length) return { added: 0, skipped: 0 };
+  const h = rows[0].map(x => x.trim().toLowerCase());
+  const find = keys => h.findIndex(x => keys.some(k => x.includes(k)));
+  let iDate = find(["datum", "date", "uitvoering", "boekingsdatum"]), iAmt = find(["bedrag", "amount", "montant"]), iType = find(["type"]), iCat = find(["categorie", "category"]), iDesc = find(["omschrijving", "mededeling", "description", "naam tegenpartij", "tegenpartij"]);
+  let start = 1;
+  if (iDate < 0 || iAmt < 0) { iDate = 0; iType = 1; iAmt = 2; iCat = 3; iDesc = 4; start = parseDate(rows[0][0]) ? 0 : 1; }
+  let added = 0, skipped = 0;
+  const newCats = { in: new Set(), out: new Set() };
+  const list = [];
+  for (const r of rows.slice(start)) {
+    const date = parseDate(r[iDate]);
+    let amt = parseAmount(r[iAmt]);
+    if (!date || !isFinite(amt) || amt === 0) { skipped++; continue; }
+    let type = amt < 0 ? "out" : "in";
+    if (iType >= 0 && r[iType]) { const tv = r[iType].toLowerCase(); if (/terug|refund/.test(tv)) type = "refund"; else if (/uit|out|debet|exp/.test(tv)) type = "out"; else if (/in|credit|ink/.test(tv)) type = "in"; }
+    let cat = iCat >= 0 && r[iCat] ? r[iCat].trim() : "Overige";
+    if (!S.settings.cats[catType(type)].includes(cat)) newCats[catType(type)].add(cat);
+    list.push({ id: uid() + added, date, type, amount: r2(Math.abs(amt)), cat, desc: iDesc >= 0 ? (r[iDesc] || "").trim().slice(0, 140) : "" });
+    added++;
+  }
+  if (added) mutate(() => {
+    for (const ty of ["in", "out"]) for (const c of newCats[ty]) if (!S.settings.cats[ty].includes(c)) S.settings.cats[ty].push(c);
+    for (const t of list) addTx(t);
+  });
+  return { added, skipped };
+}
+let fileMode = "csv";
+document.getElementById("fileIn").addEventListener("change", e => {
+  const f = e.target.files[0]; e.target.value = "";
+  if (!f) return;
+  const rd = new FileReader();
+  rd.onload = async () => {
+    const text = String(rd.result || "");
+    if (fileMode === "json") {
+      let p;
+      try { p = JSON.parse(text); } catch (err) { toast("Dit bestand is geen geldige back-up."); return; }
+      if (!p || !p.settings || !p.months) { toast("Dit bestand is geen geldige back-up."); return; }
+      const ok = await confirmDlg("Back-up terugzetten?", "Je huidige gegevens worden vervangen door de back-up.", "Terugzetten");
+      if (!ok) return;
+      mutate(() => { S = { settings: normalizeSettings(p.settings), months: p.months }; });
+      toast("Back-up teruggezet");
+    } else {
+      const r = importCSV(text);
+      toast(r.added ? `${r.added} transacties geïmporteerd${r.skipped ? ", " + r.skipped + " regels overgeslagen" : ""}` : "Geen transacties gevonden in dit bestand.");
+    }
+  };
+  rd.readAsText(f);
+});
+
+/* ---------- Gebeurtenissen ---------- */
+document.getElementById("fab").onclick = () => openTxForm();
+document.addEventListener("click", async e => {
+  const nav = e.target.closest("[data-nav]");
+  if (nav) {
+    const n = +nav.dataset.nav;
+    if (n === 0) anchor = new Date();
+    else if (tab === "week") anchor = addDays(anchor, 7 * n);
+    else if (tab === "jaar") anchor = new Date(anchor.getFullYear() + n, anchor.getMonth(), 1);
+    else anchor = new Date(anchor.getFullYear(), anchor.getMonth() + n, 1);
+    render(); return;
+  }
+  const row = e.target.closest("[data-tx]");
+  if (row) {
+    const id = row.dataset.tx;
+    if (id.startsWith("r:")) { const r = S.settings.recurring.find(x => x.id === id.split(":")[1]); if (r) openTxForm({ rule: r }); }
+    else { const t = findTx(id); if (t) openTxForm({ tx: t }); }
+    return;
+  }
+  const rule = e.target.closest("[data-rule]");
+  if (rule) { const r = S.settings.recurring.find(x => x.id === rule.dataset.rule); if (r) openTxForm({ rule: r }); return; }
+  const mrow = e.target.closest("[data-month]");
+  if (mrow) { anchor = new Date(anchor.getFullYear(), +mrow.dataset.month, 1); location.hash = "maand"; return; }
+  const act = e.target.closest("[data-act]");
+  if (!act) return;
+  const a = act.dataset.act, k = act.dataset.k;
+  if (a === "demo-keep") endDemo(true);
+  else if (a === "demo-clear") endDemo(false);
+  else if (a === "more") { txFilter.limit += 150; render(); }
+  else if (a === "export") offerFile("budget-" + todayS() + ".csv", buildCSV(), "CSV exporteren");
+  else if (a === "import") { fileMode = "csv"; document.getElementById("fileIn").click(); }
+  else if (a === "backup") offerFile("budget-backup-" + todayS() + ".json", JSON.stringify(S, null, 1), "Back-up");
+  else if (a === "restore") { fileMode = "json"; document.getElementById("fileIn").click(); }
+  else if (a === "demo") {
+    if (allStored().length || S.settings.recurring.length) { const ok = await confirmDlg("Voorbeelddata bekijken?", "Je eigen gegevens blijven bewaard. Klik daarna op ‘Terug naar mijn gegevens’.", "Bekijken"); if (!ok) return; }
+    startDemo(); render();
+  }
+  else if (a === "wipe") {
+    const ok = await confirmDlg("Alles wissen?", "Alle transacties, categorieën, budgetten en terugkerende transacties worden verwijderd. Maak eventueel eerst een back-up.", "Alles wissen");
+    if (ok) { mutate(() => { S = { settings: defaultSettings(), months: {} }; }); toast("Alles gewist"); }
+  }
+  else if (a === "savebudgets") {
+    const b = {};
+    let bad = false;
+    document.querySelectorAll("[data-budget]").forEach(inp => { const v = inp.value.trim(); if (!v) return; const n = parseAmount(v); if (n > 0) b[inp.dataset.budget] = r2(n); else bad = true; });
+    if (bad) { toast("Controleer de bedragen: gebruik getallen zoals 250 of 99,50."); return; }
+    mutate(() => { S.settings.budgets = b; });
+    toast("Budgetten opgeslagen");
+  }
+  else if (a === "addcat") {
+    const inp = document.getElementById("newcat-" + k), name = inp.value.trim();
+    if (!name) return;
+    if (S.settings.cats[k].includes(name)) { toast("Die categorie bestaat al."); return; }
+    mutate(() => { S.settings.cats[k].push(name); });
+  }
+  else if (a === "rename") {
+    const [type, i] = k.split(":"), old = S.settings.cats[type][+i];
+    const name = document.querySelector(`[data-rename="${k}"]`).value.trim();
+    if (!name || name === old) return;
+    if (S.settings.cats[type].includes(name)) { toast("Die categorie bestaat al."); return; }
+    mutate(() => renameCat(type, old, name));
+    toast("Hernoemd");
+  }
+  else if (a === "delcat") {
+    const [type, i] = k.split(":"), name = S.settings.cats[type][+i];
+    const used = allStored().filter(t => catType(t.type) === type && t.cat === name).length + S.settings.recurring.filter(r => catType(r.type) === type && r.cat === name).length;
+    const ok = await confirmDlg(`‘${name}’ verwijderen?`, used ? `${used} transactie(s) gebruiken deze categorie. Die komen onder ‘Overige’.` : "Deze categorie wordt nergens gebruikt.", "Verwijderen");
+    if (!ok) return;
+    mutate(() => {
+      S.settings.cats[type] = S.settings.cats[type].filter(c => c !== name);
+      if (used) { if (!S.settings.cats[type].includes("Overige")) S.settings.cats[type].push("Overige"); renameCat(type, name, "Overige", true); }
+      delete S.settings.budgets[name];
+    });
+  }
+});
+function renameCat(type, old, name, keepList) {
+  if (!keepList) S.settings.cats[type] = S.settings.cats[type].map(c => c === old ? name : c);
+  for (const l of Object.values(S.months)) for (const t of l) if (catType(t.type) === type && t.cat === old) t.cat = name;
+  for (const r of S.settings.recurring) if (catType(r.type) === type && r.cat === old) r.cat = name;
+  if (type === "out" && S.settings.budgets[old] != null) { if (!keepList) S.settings.budgets[name] = S.settings.budgets[old]; delete S.settings.budgets[old]; }
+}
+document.addEventListener("keydown", e => {
+  if ((e.key === "Enter" || e.key === " ") && e.target.matches("[data-tx],[data-rule],[data-month]")) { e.preventDefault(); e.target.click(); }
+});
+document.addEventListener("input", e => {
+  if (e.target.id === "fq") { txFilter.q = e.target.value; txFilter.limit = 150; render(); }
+});
+document.addEventListener("change", e => {
+  if (e.target.id === "ft") { txFilter.type = e.target.value; render(); }
+  if (e.target.id === "fc") { txFilter.cat = e.target.value; render(); }
+});
+const darkMQ = window.matchMedia("(prefers-color-scheme: dark)");
+if (darkMQ.addEventListener) darkMQ.addEventListener("change", () => render());
+new MutationObserver(() => render()).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+
+readHash();
+initStore();
+</script>
+<script>
+if ("serviceWorker" in navigator && location.protocol !== "file:") {
+  window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
+}
+</script>
+</body>
+</html>
