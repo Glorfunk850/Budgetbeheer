@@ -1,6 +1,6 @@
 // Service worker: maakt de app installeerbaar en laat ze ook zonder internet werken.
 // Verhoog VERSION na elke wijziging aan de bestanden, zodat toestellen de nieuwe versie ophalen.
-const VERSION = "budgetbeheer-v3";
+const VERSION = "budgetbeheer-v4";
 const CORE = [
   "./",
   "./index.html",

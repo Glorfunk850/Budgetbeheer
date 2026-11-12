@@ -282,6 +282,16 @@ function normalizeSettings(d) {
   return s;
 }
 
+const FREQ_CHIP = { week: "wekelijks", month: "maandelijks", quarter: "driemaandelijks" };
+function freqLabel(r) {
+  const d = pd(r.start);
+  if (r.freq === "week") return "Wekelijks op " + DAYS[(d.getDay() + 6) % 7];
+  if (r.freq === "quarter") {
+    const ms = [0, 3, 6, 9].map(o => (d.getMonth() + o) % 12).sort((a, b) => a - b).map(i => MON_S[i]);
+    return "Driemaandelijks op de " + d.getDate() + "e (" + ms.join(", ") + ")";
+  }
+  return "Maandelijks op de " + d.getDate() + "e";
+}
 function recurringInstances(rule, from, to) {
   const out = [];
   const start = rule.start, end = rule.end || "9999-12-31";
@@ -295,13 +305,17 @@ function recurringInstances(rule, from, to) {
     if (d < loD) d = addDays(d, Math.ceil((loD - d) / 86400000 / 7) * 7);
     while (ds(d) <= hi) { out.push(mk(ds(d))); d = addDays(d, 7); }
   } else {
-    const day = pd(start).getDate();
-    let y = +lo.slice(0, 4), m = +lo.slice(5, 7) - 1;
+    const sd = pd(start), day = sd.getDate();
+    const step = rule.freq === "quarter" ? 3 : 1;
+    const startIdx = sd.getFullYear() * 12 + sd.getMonth();
+    const loIdx = +lo.slice(0, 4) * 12 + (+lo.slice(5, 7) - 1);
+    let idx = startIdx + Math.max(0, Math.floor((loIdx - startIdx) / step)) * step;
     for (let i = 0; i < 1200; i++) {
+      const y = Math.floor(idx / 12), m = idx % 12;
       const date = ds(new Date(y, m, Math.min(day, dim(y, m))));
       if (date > hi) break;
       if (date >= lo) out.push(mk(date));
-      m++; if (m > 11) { m = 0; y++; }
+      idx += step;
     }
   }
   return out;
@@ -559,7 +573,7 @@ function txRow(t, showDate) {
   const d = pd(t.date);
   const meta = [showDate ? d.getDate() + " " + MON_S[d.getMonth()] + " " + d.getFullYear() : null, t.cat].filter(Boolean).join(" · ");
   return `<div class="row" data-tx="${esc(t.id)}" tabindex="0" role="button">
-    <div><div class="t">${esc(t.desc || t.cat)}${t.date > todayS() ? `<span class="chip">gepland</span>` : ""}${t.type === "refund" ? `<span class="chip">terugbetaling</span>` : ""}${t.type === "out" && refundMap.get(t.id) ? `<span class="chip" title="Netto ${fmt(t.amount - refundMap.get(t.id))}">${fmt(refundMap.get(t.id))} terugbetaald</span>` : ""}${t.recurring ? `<span class="chip" title="Terugkerend">↻ ${S.settings.recurring.find(r => r.id === t.ruleId)?.freq === "week" ? "wekelijks" : "maandelijks"}</span>` : ""}</div><div class="m">${esc(meta)}</div></div>
+    <div><div class="t">${esc(t.desc || t.cat)}${t.date > todayS() ? `<span class="chip">gepland</span>` : ""}${t.type === "refund" ? `<span class="chip">terugbetaling</span>` : ""}${t.type === "out" && refundMap.get(t.id) ? `<span class="chip" title="Netto ${fmt(t.amount - refundMap.get(t.id))}">${fmt(refundMap.get(t.id))} terugbetaald</span>` : ""}${t.recurring ? `<span class="chip" title="Terugkerend">↻ ${FREQ_CHIP[S.settings.recurring.find(r => r.id === t.ruleId)?.freq] || "maandelijks"}</span>` : ""}</div><div class="m">${esc(meta)}</div></div>
     <div class="a ${t.type === "out" ? "neg" : "pos"}">${t.type === "out" ? "−" : "+"}${fmt(t.amount)}</div>
   </div>`;
 }
@@ -701,7 +715,7 @@ function viewSettings() {
         <div style="padding-top:10px"><button class="btn primary" data-act="savebudgets">Budgetten opslaan</button></div>
       </div>
       <div class="card"><h2>Terugkerende transacties</h2><p class="hint">Voeg ze toe met de + knop en vink ‘Terugkerend’ aan.</p>
-        <div class="list">${rec.length ? rec.map(r => `<div class="row" data-rule="${esc(r.id)}" tabindex="0" role="button"><div><div class="t">${esc(r.desc || r.cat)}</div><div class="m">${r.freq === "week" ? "Wekelijks op " + DAYS[(pd(r.start).getDay() + 6) % 7] : "Maandelijks op de " + pd(r.start).getDate() + "e"} · ${esc(r.cat)}${r.end ? " · tot " + esc(r.end) : ""}</div></div><div class="a ${r.type === "out" ? "neg" : "pos"}">${r.type === "out" ? "−" : "+"}${fmt(r.amount)}</div></div>`).join("") : `<div class="empty">Nog geen terugkerende transacties.</div>`}</div>
+        <div class="list">${rec.length ? rec.map(r => `<div class="row" data-rule="${esc(r.id)}" tabindex="0" role="button"><div><div class="t">${esc(r.desc || r.cat)}</div><div class="m">${freqLabel(r)} · ${esc(r.cat)}${r.end ? " · tot " + esc(r.end) : ""}</div></div><div class="a ${r.type === "out" ? "neg" : "pos"}">${r.type === "out" ? "−" : "+"}${fmt(r.amount)}</div></div>`).join("") : `<div class="empty">Nog geen terugkerende transacties.</div>`}</div>
       </div>
     </div>
     <div class="grid2">
@@ -779,7 +793,7 @@ function openTxForm(opts) {
     <div class="field"><label for="fDesc">Omschrijving (optioneel)</label><input id="fDesc" autocomplete="off" value="${esc(t.desc)}" placeholder="bv. Delhaize, huur, tankbeurt"></div>
     <label class="check"><input type="checkbox" id="fRec" ${t.rec ? "checked" : ""}> Terugkerend</label>
     <div class="two" id="recBox" ${t.rec ? "" : "hidden"}>
-      <div class="field"><label for="fFreq">Herhaling</label><select id="fFreq"><option value="month" ${t.freq === "month" ? "selected" : ""}>Maandelijks</option><option value="week" ${t.freq === "week" ? "selected" : ""}>Wekelijks</option></select></div>
+      <div class="field"><label for="fFreq">Herhaling</label><select id="fFreq"><option value="month" ${t.freq === "month" ? "selected" : ""}>Maandelijks</option><option value="quarter" ${t.freq === "quarter" ? "selected" : ""}>Driemaandelijks</option><option value="week" ${t.freq === "week" ? "selected" : ""}>Wekelijks</option></select></div>
       <div class="field"><label for="fEnd">Einddatum (optioneel)</label><input id="fEnd" type="date" value="${esc(t.end)}"></div>
     </div>
     <div class="err" id="fErr" role="alert"></div>
